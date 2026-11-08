@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 import os
 
+
 # ==================================================
 # 1. 웹 프로그램 기본 설정
 # ==================================================
@@ -13,6 +14,7 @@ st.set_page_config(
     page_icon="🏭",
     layout="wide"
 )
+
 
 # ==================================================
 # 2. 프로그램 제목 및 설명
@@ -71,7 +73,7 @@ if df is not None:
         "operating_status"
     ]
 
-    # 누락된 컬럼 확인
+    # CSV 컬럼 확인
     missing_columns = [
         col for col in required_columns
         if col not in df.columns
@@ -82,15 +84,16 @@ if df is not None:
         st.error(
             f"CSV에 필요한 컬럼이 없습니다: {missing_columns}"
         )
+
         st.stop()
 
-    # 날짜와 시간 형식으로 변환
+    # 생산 시간을 날짜와 시간 형식으로 변환
     df["timestamp"] = pd.to_datetime(
         df["timestamp"],
         errors="coerce"
     )
 
-    # 숫자 형식으로 변환
+    # 숫자 컬럼 변환
     number_columns = [
         "production_count",
         "defect_count",
@@ -104,13 +107,14 @@ if df is not None:
             errors="coerce"
         )
 
-    # 생산량과 불량 수량에 잘못된 값이 있는지 확인
+    # 생산량과 불량 수량 확인
     if df[["production_count", "defect_count"]].isna().any().any():
 
         st.error("생산량 또는 불량 수량에 잘못된 값이 있습니다.")
+
         st.stop()
 
-    # 생산량과 불량 수량의 범위 확인
+    # 생산량 및 불량 수량 범위 확인
     if (
         (df["production_count"] < 0).any()
         or (df["defect_count"] < 0).any()
@@ -118,9 +122,10 @@ if df is not None:
     ):
 
         st.error("생산량 또는 불량 수량이 올바르지 않습니다.")
+
         st.stop()
 
-    # 날짜 변환 오류 안내
+    # 날짜 형식 오류 안내
     if df["timestamp"].isna().any():
 
         st.warning("일부 생산 시간이 날짜 형식으로 변환되지 않았습니다.")
@@ -161,7 +166,11 @@ if menu == "생산 현황":
 
         # 설비번호 목록 자동 생성
         machines = ["전체"] + sorted(
-            df["machine_id"].dropna().astype(str).unique().tolist()
+            df["machine_id"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
         )
 
         selected_machine = st.selectbox(
@@ -175,12 +184,13 @@ if menu == "생산 현황":
         if valid_dates.empty:
 
             st.error("검색할 수 있는 날짜 데이터가 없습니다.")
+
             st.stop()
 
         min_date = valid_dates.min().date()
         max_date = valid_dates.max().date()
 
-        # 시작 날짜 및 종료 날짜 선택
+        # 날짜 선택
         col1, col2 = st.columns(2)
 
         with col1:
@@ -201,6 +211,7 @@ if menu == "생산 현황":
         if start_date > end_date:
 
             st.error("시작 날짜가 종료 날짜보다 늦습니다.")
+
             st.stop()
 
         # ------------------------------------------
@@ -221,7 +232,8 @@ if menu == "생산 현황":
         if selected_machine != "전체":
 
             filtered = filtered[
-                filtered["machine_id"].astype(str) == selected_machine
+                filtered["machine_id"].astype(str)
+                == selected_machine
             ].copy()
 
         st.write(
@@ -233,6 +245,7 @@ if menu == "생산 현황":
             st.warning(
                 "선택한 날짜와 설비에 해당하는 데이터가 없습니다."
             )
+
             st.stop()
 
         st.divider()
@@ -247,7 +260,7 @@ if menu == "생산 현황":
 
         normal = total - defect
 
-        # 생산량이 0이면 0으로 나누지 않음
+        # 생산량이 0이면 나눗셈 오류 방지
         defect_rate = (
             defect / total * 100
             if total > 0
@@ -288,7 +301,10 @@ if menu == "생산 현황":
 
         else:
 
-            st.metric("평균 공정 온도", "데이터 없음")
+            st.metric(
+                "평균 공정 온도",
+                "데이터 없음"
+            )
 
         st.divider()
 
@@ -318,18 +334,27 @@ if menu == "생산 현황":
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.metric("목표 생산량", f"{target:,}개")
+
+            st.metric(
+                "목표 생산량",
+                f"{target:,}개"
+            )
 
         with col2:
-            st.metric("실제 생산량", f"{actual:,}개")
+
+            st.metric(
+                "실제 생산량",
+                f"{actual:,}개"
+            )
 
         with col3:
+
             st.metric(
                 "목표 달성률",
                 f"{achievement_rate:.1f}%"
             )
 
-        # 100%를 초과해도 진행률 막대는 100%까지만 표시
+        # 진행률 막대는 최대 100%까지만 표시
         progress_rate = min(
             achievement_rate / 100,
             1.0
@@ -379,6 +404,7 @@ if menu == "생산 현황":
             ascending=False
         )
 
+        # 상위 10개 설비
         top10 = machine_data.head(10).copy()
 
         if not top10.empty:
@@ -401,7 +427,7 @@ if menu == "생산 현황":
                 categoryarray=top10["machine_id"].tolist()
             )
 
-            # 막대 위 숫자와 마우스 정보 표시
+            # 막대 위 숫자 표시
             fig.update_traces(
                 texttemplate="%{y:,.0f}",
                 textposition="outside",
@@ -489,13 +515,17 @@ if menu == "생산 현황":
             col1, col2 = st.columns(2)
 
             with col1:
+
                 st.write("**데이터 시작 시간**")
+
                 st.write(
                     start_time.strftime("%Y-%m-%d %H:%M")
                 )
 
             with col2:
+
                 st.write("**데이터 종료 시간**")
+
                 st.write(
                     end_time.strftime("%Y-%m-%d %H:%M")
                 )
@@ -539,7 +569,7 @@ elif menu == "품질 관리":
 
         st.subheader("전체 품질 현황")
 
-        # CSV 전체 데이터를 기준으로 계산
+        # CSV 전체 데이터 기준
         quality_total = int(
             df["production_count"].sum()
         )
@@ -548,7 +578,7 @@ elif menu == "품질 관리":
             df["defect_count"].sum()
         )
 
-        # 전체 불량률
+        # 전체 불량률 계산
         if quality_total > 0:
 
             quality_rate = (
@@ -598,7 +628,7 @@ elif menu == "품질 관리":
             "설비별 불량률을 계산합니다."
         )
 
-        # 설비별 생산량과 불량 수량의 합계
+        # 설비별 생산량과 불량 수량 합계
         quality_data = (
             df.groupby("machine_id")[
                 ["production_count", "defect_count"]
@@ -611,7 +641,7 @@ elif menu == "품질 관리":
         # 7-3. 설비별 불량률 계산
         # ------------------------------------------
 
-        # 생산량이 0이면 NaN으로 처리
+        # 생산량이 0이면 계산 불가
         quality_data["defect_rate"] = (
             quality_data["defect_count"]
             /
@@ -621,9 +651,9 @@ elif menu == "품질 관리":
             * 100
         )
 
-        # ==========================================
-        # 7-4. 품질 경고 기능 (새로운 기능)
-        # ==========================================
+        # ------------------------------------------
+        # 7-4. 품질 경고 기능 (기존 기능 유지)
+        # ------------------------------------------
 
         st.subheader("품질 경고 기준 설정")
 
@@ -632,10 +662,7 @@ elif menu == "품질 관리":
             "자동으로 판정합니다."
         )
 
-        # ------------------------------------------
-        # ① 허용 불량률 슬라이더
-        # ------------------------------------------
-
+        # 허용 불량률 슬라이더
         allowed_rate = st.slider(
             "허용 불량률 (%)",
             min_value=0.0,
@@ -644,24 +671,14 @@ elif menu == "품질 관리":
             step=0.1
         )
 
-        # 현재 설정된 허용 불량률 표시
         st.write(
             f"**현재 허용 불량률: {allowed_rate:.1f}%**"
         )
 
-        # ------------------------------------------
-        # ② 품질 상태를 저장할 컬럼 생성
-        # ------------------------------------------
-
-        # 기본 상태는 계산 불가
+        # 품질 상태 초기값
         quality_data["quality_status"] = "계산 불가"
 
-        # ------------------------------------------
-        # ③ 정상 설비 판정
-        # ------------------------------------------
-
-        # 생산량이 0보다 크고,
-        # 불량률이 허용 기준 이하인 설비
+        # 정상 판정
         normal_condition = (
             (quality_data["production_count"] > 0)
             &
@@ -673,12 +690,7 @@ elif menu == "품질 관리":
             "quality_status"
         ] = "정상"
 
-        # ------------------------------------------
-        # ④ 경고 설비 판정
-        # ------------------------------------------
-
-        # 생산량이 0보다 크고,
-        # 불량률이 허용 기준을 초과한 설비
+        # 경고 판정
         warning_condition = (
             (quality_data["production_count"] > 0)
             &
@@ -690,26 +702,20 @@ elif menu == "품질 관리":
             "quality_status"
         ] = "경고"
 
-        # ------------------------------------------
-        # ⑤ 설비 개수 계산
-        # ------------------------------------------
+        # 품질 상태별 설비 개수
+        normal_count = int(
+            (quality_data["quality_status"] == "정상").sum()
+        )
 
-        normal_count = (
-            quality_data["quality_status"] == "정상"
-        ).sum()
+        warning_count = int(
+            (quality_data["quality_status"] == "경고").sum()
+        )
 
-        warning_count = (
-            quality_data["quality_status"] == "경고"
-        ).sum()
+        unknown_count = int(
+            (quality_data["quality_status"] == "계산 불가").sum()
+        )
 
-        unknown_count = (
-            quality_data["quality_status"] == "계산 불가"
-        ).sum()
-
-        # ------------------------------------------
-        # ⑥ 품질 상태별 설비 개수 표시
-        # ------------------------------------------
-
+        # 품질 상태 현황
         st.subheader("품질 상태 현황")
 
         col1, col2, col3 = st.columns(3)
@@ -735,10 +741,7 @@ elif menu == "품질 관리":
                 f"{unknown_count:,}개"
             )
 
-        # ------------------------------------------
-        # ⑦ 경고 메시지 표시
-        # ------------------------------------------
-
+        # 품질 경고 메시지
         if warning_count > 0:
 
             st.error(
@@ -755,16 +758,15 @@ elif menu == "품질 관리":
         st.divider()
 
         # ------------------------------------------
-        # 7-5. 설비별 품질 분석 표
+        # 7-5. 기존 설비별 품질 분석 표
         # ------------------------------------------
 
         st.subheader("설비별 품질 분석 결과")
 
-        # 숫자 계산 결과를 유지하도록 복사
+        # 원본 계산값을 유지하기 위해 복사
         quality_table = quality_data.copy()
 
-        # 불량률을 소수점 둘째 자리로 변환
-        # 생산량이 0이면 '계산 불가' 표시
+        # 불량률 표시 형식
         quality_table["defect_rate"] = (
             quality_table["defect_rate"].apply(
                 lambda x: f"{x:.2f}%"
@@ -773,7 +775,7 @@ elif menu == "품질 관리":
             )
         )
 
-        # 컬럼 이름 한글로 변경
+        # 컬럼 이름 변경
         quality_table = quality_table.rename(
             columns={
                 "machine_id": "설비번호",
@@ -784,7 +786,7 @@ elif menu == "품질 관리":
             }
         )
 
-        # 정수 형식으로 변환
+        # 생산량과 불량 수량을 정수로 변환
         quality_table["총생산량"] = (
             quality_table["총생산량"].astype(int)
         )
@@ -793,13 +795,7 @@ elif menu == "품질 관리":
             quality_table["불량 수량"].astype(int)
         )
 
-        # ------------------------------------------
-        # ⑧ 품질 상태별 색상 설정
-        # ------------------------------------------
-
-        # 정상: 초록색
-        # 경고: 빨간색
-        # 계산 불가: 회색
+        # 품질 상태에 따라 색상 적용
         styled_table = quality_table.style.map(
             lambda value:
                 "color: green; font-weight: bold"
@@ -812,17 +808,13 @@ elif menu == "품질 관리":
             subset=["품질 상태"]
         )
 
-        # ------------------------------------------
-        # ⑨ 표 출력
-        # ------------------------------------------
-
+        # 기존 품질 분석 표 출력
         st.dataframe(
             styled_table,
             use_container_width=True,
             hide_index=True
         )
 
-        # 분석된 설비 개수 표시
         st.write(
             f"**분석된 전체 설비 수: {len(quality_table):,}개**"
         )
@@ -844,13 +836,13 @@ elif menu == "품질 관리":
             quality_data["production_count"] > 0
         ].copy()
 
-        # 불량률이 높은 순서로 정렬
+        # 불량률이 높은 순서대로 정렬
         quality_graph = quality_graph.sort_values(
             "defect_rate",
             ascending=False
         )
 
-        # 상위 10개 설비 선택
+        # 상위 10개 설비
         quality_top10 = quality_graph.head(10).copy()
 
         if not quality_top10.empty:
@@ -867,7 +859,7 @@ elif menu == "품질 관리":
                 }
             )
 
-            # 불량률이 높은 순서 유지
+            # 순서 유지
             fig_quality.update_xaxes(
                 categoryorder="array",
                 categoryarray=quality_top10[
@@ -886,6 +878,7 @@ elif menu == "품질 관리":
                 )
             )
 
+            # 그래프 디자인
             fig_quality.update_layout(
                 xaxis_title="설비번호",
                 yaxis_title="불량률(%)",
@@ -929,7 +922,7 @@ elif menu == "품질 관리":
         # 원본 데이터 변경 방지
         daily_df = df.copy()
 
-        # timestamp에서 날짜만 추출
+        # 날짜 추출
         daily_df["date"] = daily_df["timestamp"].dt.date
 
         # 날짜가 없는 기록 제외
@@ -945,7 +938,6 @@ elif menu == "품질 관리":
         )
 
         # 날짜별 불량률 계산
-        # 생산량이 0이면 NaN 처리
         daily_data["defect_rate"] = (
             daily_data["defect_count"]
             /
@@ -961,7 +953,11 @@ elif menu == "품질 관리":
             ascending=True
         )
 
-        # Plotly 선그래프
+        # 날짜를 Plotly에서 사용할 날짜 형식으로 변환
+        daily_data["date"] = pd.to_datetime(
+            daily_data["date"]
+        )
+
         if not daily_data.empty:
 
             fig_daily = px.line(
@@ -976,7 +972,7 @@ elif menu == "품질 관리":
                 }
             )
 
-            # 마우스를 올리면 날짜와 불량률 표시
+            # 마우스 정보
             fig_daily.update_traces(
                 hovertemplate=(
                     "날짜: %{x|%Y-%m-%d}<br>"
@@ -1011,18 +1007,222 @@ elif menu == "품질 관리":
                 use_container_width=True
             )
 
-            # 생산량이 0인 날짜가 있으면 안내
             if (daily_data["production_count"] == 0).any():
 
                 st.info(
                     "생산량이 0인 날짜는 불량률을 "
-                    "계산할 수 없어 그래프에서 점이 표시되지 않습니다."
+                    "계산할 수 없어 그래프에 점이 표시되지 않습니다."
                 )
 
         else:
 
             st.warning(
                 "날짜별 불량률을 분석할 수 있는 데이터가 없습니다."
+            )
+
+        st.divider()
+
+        # ==========================================
+        # 7-8. 설비별 품질 순위표 (새로운 기능)
+        # ==========================================
+
+        st.subheader("설비별 품질 순위")
+
+        st.write(
+            "불량률이 낮은 설비부터 순위를 부여합니다. "
+            "생산량이 0인 설비는 순위에서 제외합니다."
+        )
+
+        # ------------------------------------------
+        # ① 생산량이 0보다 큰 설비만 선택
+        # ------------------------------------------
+
+        ranking_data = quality_data[
+            quality_data["production_count"] > 0
+        ].copy()
+
+        # ------------------------------------------
+        # ② 불량률이 낮은 순서로 정렬
+        # ------------------------------------------
+
+        ranking_data = ranking_data.sort_values(
+            ["defect_rate", "machine_id"],
+            ascending=[True, True]
+        ).reset_index(drop=True)
+
+        # ------------------------------------------
+        # ③ 순위 번호 추가
+        # ------------------------------------------
+
+        # 1위부터 차례대로 번호 부여
+        ranking_data.insert(
+            0,
+            "rank",
+            range(1, len(ranking_data) + 1)
+        )
+
+        # ------------------------------------------
+        # ④ 순위표 표시 형식 변경
+        # ------------------------------------------
+
+        ranking_table = ranking_data.copy()
+
+        # 불량률 소수점 둘째 자리
+        ranking_table["defect_rate"] = (
+            ranking_table["defect_rate"].apply(
+                lambda x: f"{x:.2f}%"
+            )
+        )
+
+        # 컬럼 이름 한글로 변경
+        ranking_table = ranking_table.rename(
+            columns={
+                "rank": "순위",
+                "machine_id": "설비번호",
+                "production_count": "총생산량",
+                "defect_count": "불량 수량",
+                "defect_rate": "불량률",
+                "quality_status": "품질 상태"
+            }
+        )
+
+        # 순위표 컬럼 순서 지정
+        ranking_table = ranking_table[
+            [
+                "순위",
+                "설비번호",
+                "총생산량",
+                "불량 수량",
+                "불량률",
+                "품질 상태"
+            ]
+        ]
+
+        # 생산량과 불량 수량을 정수로 표시
+        ranking_table["총생산량"] = (
+            ranking_table["총생산량"].astype(int)
+        )
+
+        ranking_table["불량 수량"] = (
+            ranking_table["불량 수량"].astype(int)
+        )
+
+        # ------------------------------------------
+        # ⑤ 전체 설비 품질 순위표
+        # ------------------------------------------
+
+        st.subheader("전체 설비 품질 순위표")
+
+        # 품질 상태 색상 적용
+        styled_ranking = ranking_table.style.map(
+            lambda value:
+                "color: green; font-weight: bold"
+                if value == "정상"
+                else (
+                    "color: red; font-weight: bold"
+                    if value == "경고"
+                    else "color: gray"
+                ),
+            subset=["품질 상태"]
+        )
+
+        st.dataframe(
+            styled_ranking,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # 순위에 포함된 설비 수
+        st.write(
+            f"**순위에 포함된 설비: {len(ranking_table):,}개**"
+        )
+
+        st.divider()
+
+        # ------------------------------------------
+        # ⑥ 품질 우수 설비 TOP 10
+        # ------------------------------------------
+
+        st.subheader("품질 우수 설비 TOP 10")
+
+        st.write(
+            "불량률이 가장 낮은 상위 10개 설비입니다."
+        )
+
+        # 전체 순위표에서 처음 10개 선택
+        ranking_top10 = ranking_table.head(10).copy()
+
+        # TOP 10 품질 상태 색상 적용
+        styled_top10 = ranking_top10.style.map(
+            lambda value:
+                "color: green; font-weight: bold"
+                if value == "정상"
+                else (
+                    "color: red; font-weight: bold"
+                    if value == "경고"
+                    else "color: gray"
+                ),
+            subset=["품질 상태"]
+        )
+
+        st.dataframe(
+            styled_top10,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.divider()
+
+        # ------------------------------------------
+        # ⑦ 생산량이 0인 설비 별도 표시
+        # ------------------------------------------
+
+        st.subheader("품질 순위 제외 설비")
+
+        # 생산량이 0인 설비만 선택
+        excluded_data = quality_data[
+            quality_data["production_count"] == 0
+        ].copy()
+
+        if not excluded_data.empty:
+
+            # 표시할 컬럼 선택
+            excluded_table = excluded_data[
+                [
+                    "machine_id",
+                    "production_count",
+                    "defect_count"
+                ]
+            ].copy()
+
+            # 컬럼 이름 변경
+            excluded_table = excluded_table.rename(
+                columns={
+                    "machine_id": "설비번호",
+                    "production_count": "총생산량",
+                    "defect_count": "불량 수량"
+                }
+            )
+
+            # 계산 불가 상태 추가
+            excluded_table["불량률"] = "계산 불가"
+            excluded_table["품질 상태"] = "계산 불가"
+
+            st.warning(
+                f"생산량이 0인 설비가 "
+                f"{len(excluded_table):,}개 있습니다."
+            )
+
+            st.dataframe(
+                excluded_table,
+                use_container_width=True,
+                hide_index=True
+            )
+
+        else:
+
+            st.success(
+                "생산량이 0인 설비가 없습니다."
             )
 
     else:
