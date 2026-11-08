@@ -84,7 +84,7 @@ if df is not None:
 
         st.stop()
 
-    # 생산 시간을 날짜·시간 형식으로 변환
+    # 생산 시간을 날짜와 시간 형식으로 변환
     df["timestamp"] = pd.to_datetime(
         df["timestamp"],
         errors="coerce"
@@ -251,15 +251,11 @@ if menu == "생산 현황":
         # 6-3. 주요 생산지표 계산
         # ==========================================
 
-        # 실제 전체 생산량
-        total = int(
-            filtered["production_count"].sum()
-        )
+        # 선택한 데이터의 전체 생산량
+        total = int(filtered["production_count"].sum())
 
-        # 불량 제품 수
-        defect = int(
-            filtered["defect_count"].sum()
-        )
+        # 선택한 데이터의 불량 제품 수
+        defect = int(filtered["defect_count"].sum())
 
         # 정상 제품 수
         normal = total - defect
@@ -330,7 +326,7 @@ if menu == "생산 현황":
         st.divider()
 
         # ==========================================
-        # 6-5. 생산 목표 달성률 (새로운 기능)
+        # 6-5. 생산 목표 달성률
         # ==========================================
 
         st.subheader("생산 목표 달성률")
@@ -341,10 +337,7 @@ if menu == "생산 현황":
             "목표 달성률을 계산합니다."
         )
 
-        # ------------------------------------------
         # 목표 생산량 입력
-        # ------------------------------------------
-
         target = st.number_input(
             "목표 생산량 입력",
             min_value=1,
@@ -353,20 +346,13 @@ if menu == "생산 현황":
             format="%d"
         )
 
-        # ------------------------------------------
-        # 목표 달성률 계산
-        # ------------------------------------------
-
-        # 실제 생산량은 필터링된 데이터의 총생산량
+        # 실제 생산량
         actual = total
 
         # 목표 달성률 계산
         achievement_rate = actual / target * 100
 
-        # ------------------------------------------
-        # 목표 달성률 숫자 표시
-        # ------------------------------------------
-
+        # 목표 생산량, 실제 생산량, 달성률 표시
         col1, col2, col3 = st.columns(3)
 
         with col1:
@@ -390,20 +376,12 @@ if menu == "생산 현황":
                 f"{achievement_rate:.1f}%"
             )
 
-        # ------------------------------------------
-        # 진행률 막대 계산
-        # ------------------------------------------
-
-        # 100% 초과 시 진행률 막대는 100%까지만 표시
+        # 진행률 막대는 최대 100%까지만 표시
         progress_rate = min(achievement_rate / 100, 1.0)
 
-        # 진행률 막대 표시
         st.progress(progress_rate)
 
-        # ------------------------------------------
         # 목표 달성 여부 안내
-        # ------------------------------------------
-
         if achievement_rate >= 100:
 
             st.success(
@@ -503,10 +481,7 @@ if menu == "생산 현황":
                 use_container_width=True
             )
 
-            # --------------------------------------
             # 설비별 생산량 TOP 10 데이터 표
-            # --------------------------------------
-
             st.write("**설비별 생산량 TOP 10 데이터**")
 
             top10_table = top10.rename(
@@ -555,10 +530,7 @@ if menu == "생산 현황":
                 f"{total_columns}개"
             )
 
-        # ------------------------------------------
         # 전체 데이터 기록 기간
-        # ------------------------------------------
-
         st.subheader("전체 데이터 기록 기간")
 
         valid_dates = df["timestamp"].dropna()
@@ -610,7 +582,7 @@ if menu == "생산 현황":
         )
 
 # --------------------------------------------------
-# 7. 품질 관리 메뉴
+# 7. 품질 관리 메뉴 (새로운 기능)
 # --------------------------------------------------
 
 elif menu == "품질 관리":
@@ -619,9 +591,139 @@ elif menu == "품질 관리":
 
     st.write("제품의 품질과 불량률을 확인하는 화면입니다.")
 
-    st.info(
-        "추후 설비별 불량률과 품질 경고 기능을 추가합니다."
-    )
+    if df is not None:
+
+        # ==========================================
+        # 7-1. 전체 불량률 계산
+        # ==========================================
+
+        # 전체 생산량
+        quality_total = int(
+            df["production_count"].sum()
+        )
+
+        # 전체 불량 수량
+        quality_defect = int(
+            df["defect_count"].sum()
+        )
+
+        # 전체 불량률 계산
+        if quality_total > 0:
+
+            quality_rate = (
+                quality_defect / quality_total * 100
+            )
+
+            quality_rate_text = f"{quality_rate:.2f}%"
+
+        else:
+
+            quality_rate_text = "계산 불가"
+
+        # 전체 품질지표 표시
+        st.subheader("전체 품질 현황")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+
+            st.metric(
+                "전체 생산량",
+                f"{quality_total:,}개"
+            )
+
+        with col2:
+
+            st.metric(
+                "전체 불량 수량",
+                f"{quality_defect:,}개"
+            )
+
+        with col3:
+
+            st.metric(
+                "전체 불량률",
+                quality_rate_text
+            )
+
+        st.divider()
+
+        # ==========================================
+        # 7-2. 설비별 생산량과 불량 수량 계산
+        # ==========================================
+
+        st.subheader("설비별 품질 분석")
+
+        st.write(
+            "설비별 총생산량과 불량 수량을 이용하여 "
+            "불량률을 계산합니다."
+        )
+
+        # machine_id를 기준으로 데이터 그룹화
+        quality_data = (
+            df.groupby("machine_id")[
+                ["production_count", "defect_count"]
+            ]
+            .sum()
+            .reset_index()
+        )
+
+        # ==========================================
+        # 7-3. 설비별 불량률 계산
+        # ==========================================
+
+        # 생산량이 0인 설비는 결측값으로 처리
+        quality_data["defect_rate"] = (
+            quality_data["defect_count"]
+            /
+            quality_data["production_count"].replace(0, float("nan"))
+            * 100
+        )
+
+        # ==========================================
+        # 7-4. 불량률 표시 형식 변경
+        # ==========================================
+
+        # 계산할 수 없는 값은 "계산 불가"로 표시
+        quality_data["defect_rate"] = quality_data[
+            "defect_rate"
+        ].map(
+            lambda x: f"{x:.2f}%" if pd.notna(x) else "계산 불가"
+        )
+
+        # ==========================================
+        # 7-5. 컬럼 이름을 한글로 변경
+        # ==========================================
+
+        quality_table = quality_data.rename(
+            columns={
+                "machine_id": "설비번호",
+                "production_count": "총생산량",
+                "defect_count": "불량 수량",
+                "defect_rate": "불량률"
+            }
+        )
+
+        # ==========================================
+        # 7-6. 결과 표 출력
+        # ==========================================
+
+        st.dataframe(
+            quality_table,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # 분석된 설비 개수 표시
+        st.write(
+            f"분석된 설비 수: {len(quality_table):,}개"
+        )
+
+    else:
+
+        st.warning(
+            "CSV 파일을 업로드하면 품질 분석 결과가 표시됩니다."
+        )
 
 # --------------------------------------------------
 # 8. 설비 모니터링 메뉴
