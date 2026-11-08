@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 import os
 
+
 # ==================================================
 # 1. 웹 프로그램 기본 설정
 # ==================================================
@@ -16,9 +17,13 @@ st.set_page_config(
 
 st.title("스마트공장 생산 모니터링 시스템")
 
-st.write("공장의 생산량과 설비 상태를 확인하는 프로그램입니다.")
+st.write(
+    "공장의 생산량과 설비 상태를 확인하는 프로그램입니다."
+)
 
-st.info("현재 표시되는 데이터는 교육용 가상 제조데이터입니다.")
+st.info(
+    "현재 표시되는 데이터는 교육용 가상 제조데이터입니다."
+)
 
 
 # ==================================================
@@ -45,6 +50,7 @@ else:
     )
 
     if uploaded_file is not None:
+
         df = pd.read_csv(uploaded_file)
 
 
@@ -54,6 +60,7 @@ else:
 
 if df is not None:
 
+    # 필요한 컬럼 목록
     required_columns = [
         "timestamp",
         "machine_id",
@@ -65,17 +72,21 @@ if df is not None:
         "operating_status"
     ]
 
-    # 필요한 컬럼이 모두 있는지 확인
+    # 필요한 컬럼이 있는지 확인
     missing_columns = [
         col for col in required_columns
         if col not in df.columns
     ]
 
     if missing_columns:
-        st.error(f"필요한 컬럼이 없습니다: {missing_columns}")
+
+        st.error(
+            f"CSV에 필요한 컬럼이 없습니다: {missing_columns}"
+        )
+
         st.stop()
 
-    # 날짜 형식으로 변환
+    # 날짜와 시간 형식으로 변환
     df["timestamp"] = pd.to_datetime(
         df["timestamp"],
         errors="coerce"
@@ -90,25 +101,40 @@ if df is not None:
     ]
 
     for col in number_columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # 생산량과 불량 수량 확인
+        df[col] = pd.to_numeric(
+            df[col],
+            errors="coerce"
+        )
+
+    # 생산량과 불량 수량에 잘못된 값이 있는지 확인
     if df[["production_count", "defect_count"]].isna().any().any():
-        st.error("생산량 또는 불량 수량에 잘못된 값이 있습니다.")
+
+        st.error(
+            "생산량 또는 불량 수량에 잘못된 값이 있습니다."
+        )
+
         st.stop()
 
-    # 생산량과 불량 수량이 올바른지 검사
+    # 생산량과 불량 수량의 범위 확인
     if (
         (df["production_count"] < 0).any()
         or (df["defect_count"] < 0).any()
         or (df["defect_count"] > df["production_count"]).any()
     ):
-        st.error("생산량 또는 불량 수량이 올바르지 않습니다.")
+
+        st.error(
+            "생산량 또는 불량 수량이 올바르지 않습니다."
+        )
+
         st.stop()
 
     # 날짜 변환 오류 안내
     if df["timestamp"].isna().any():
-        st.warning("일부 생산 시간이 날짜 형식으로 변환되지 않았습니다.")
+
+        st.warning(
+            "일부 생산 시간이 날짜 형식으로 변환되지 않았습니다."
+        )
 
 
 # ==================================================
@@ -134,7 +160,9 @@ if menu == "생산 현황":
 
     st.header("생산 현황")
 
-    st.write("공장의 주요 생산지표를 확인합니다.")
+    st.write(
+        "공장의 주요 생산지표를 확인합니다."
+    )
 
     if df is not None:
 
@@ -144,43 +172,60 @@ if menu == "생산 현황":
 
         st.subheader("생산 데이터 검색 조건")
 
-        # 설비번호 목록
+        # CSV에서 설비번호 목록 자동 생성
         machines = ["전체"] + sorted(
-            df["machine_id"].dropna().astype(str).unique().tolist()
+            df["machine_id"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
         )
 
+        # 설비 선택
         selected_machine = st.selectbox(
             "설비번호 선택",
             machines
         )
 
-        # 날짜 범위 확인
+        # 날짜 데이터 확인
         valid_dates = df["timestamp"].dropna()
 
         if valid_dates.empty:
-            st.error("검색할 수 있는 날짜 데이터가 없습니다.")
+
+            st.error(
+                "검색할 수 있는 날짜 데이터가 없습니다."
+            )
+
             st.stop()
 
+        # 전체 데이터의 시작 날짜와 종료 날짜
         min_date = valid_dates.min().date()
         max_date = valid_dates.max().date()
 
+        # 날짜 선택
         col1, col2 = st.columns(2)
 
         with col1:
+
             start_date = st.date_input(
                 "시작 날짜",
                 value=min_date
             )
 
         with col2:
+
             end_date = st.date_input(
                 "종료 날짜",
                 value=max_date
             )
 
-        # 날짜 범위 검사
+        # 날짜 범위 확인
         if start_date > end_date:
-            st.error("시작 날짜가 종료 날짜보다 늦습니다.")
+
+            st.error(
+                "시작 날짜가 종료 날짜보다 늦습니다."
+            )
+
             st.stop()
 
         # ------------------------------------------
@@ -190,14 +235,14 @@ if menu == "생산 현황":
         # 원본 데이터 변경 방지
         filtered = df.copy()
 
-        # 날짜 조건
+        # 날짜 조건 적용
         filtered = filtered[
             (filtered["timestamp"].dt.date >= start_date)
             &
             (filtered["timestamp"].dt.date <= end_date)
         ].copy()
 
-        # 설비번호 조건
+        # 설비번호 조건 적용
         if selected_machine != "전체":
 
             filtered = filtered[
@@ -205,63 +250,107 @@ if menu == "생산 현황":
                 == selected_machine
             ].copy()
 
+        # 선택한 기록 개수 표시
         st.write(
             f"**선택한 조건의 생산 기록: {len(filtered):,}건**"
         )
 
         if filtered.empty:
-            st.warning("선택한 조건에 해당하는 데이터가 없습니다.")
+
+            st.warning(
+                "선택한 날짜와 설비에 해당하는 데이터가 없습니다."
+            )
+
             st.stop()
 
         st.divider()
 
         # ------------------------------------------
-        # 5-3. 주요 생산지표
+        # 5-3. 주요 생산지표 계산
         # ------------------------------------------
 
-        total = int(filtered["production_count"].sum())
-        defect = int(filtered["defect_count"].sum())
+        # 전체 생산량
+        total = int(
+            filtered["production_count"].sum()
+        )
+
+        # 불량 제품 수
+        defect = int(
+            filtered["defect_count"].sum()
+        )
+
+        # 정상 제품 수
         normal = total - defect
 
+        # 전체 불량률
         defect_rate = (
             defect / total * 100
             if total > 0
             else 0
         )
 
-        avg_temperature = filtered["temperature"].mean()
+        # 평균 공정 온도
+        avg_temperature = (
+            filtered["temperature"].mean()
+        )
+
+        # ------------------------------------------
+        # 5-4. 주요 생산지표 표시
+        # ------------------------------------------
 
         st.subheader("주요 생산지표")
 
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            st.metric("총생산량", f"{total:,}개")
+
+            st.metric(
+                "총생산량",
+                f"{total:,}개"
+            )
 
         with col2:
-            st.metric("정상 제품", f"{normal:,}개")
+
+            st.metric(
+                "정상 제품",
+                f"{normal:,}개"
+            )
 
         with col3:
-            st.metric("불량 제품", f"{defect:,}개")
+
+            st.metric(
+                "불량 제품",
+                f"{defect:,}개"
+            )
 
         with col4:
-            st.metric("불량률", f"{defect_rate:.2f}%")
+
+            st.metric(
+                "불량률",
+                f"{defect_rate:.2f}%"
+            )
 
         st.divider()
 
-        # 평균 온도
+        # 평균 공정 온도
         if pd.notna(avg_temperature):
+
             st.metric(
                 "평균 공정 온도",
                 f"{avg_temperature:.2f}℃"
             )
+
         else:
-            st.metric("평균 공정 온도", "데이터 없음")
+
+            st.metric(
+                "평균 공정 온도",
+                "데이터 없음"
+            )
 
         st.divider()
 
         # ------------------------------------------
-        # 5-4. 생산 목표 달성률
+        # 5-5. 생산 목표 달성률
         # ------------------------------------------
 
         st.subheader("생산 목표 달성률")
@@ -271,6 +360,7 @@ if menu == "생산 현황":
             "설비와 날짜의 생산량을 기준으로 계산합니다."
         )
 
+        # 목표 생산량 입력
         target = st.number_input(
             "목표 생산량 입력",
             min_value=1,
@@ -279,35 +369,55 @@ if menu == "생산 현황":
             format="%d"
         )
 
+        # 실제 생산량
         actual = total
+
+        # 목표 달성률 계산
         achievement_rate = actual / target * 100
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.metric("목표 생산량", f"{target:,}개")
+
+            st.metric(
+                "목표 생산량",
+                f"{target:,}개"
+            )
 
         with col2:
-            st.metric("실제 생산량", f"{actual:,}개")
+
+            st.metric(
+                "실제 생산량",
+                f"{actual:,}개"
+            )
 
         with col3:
+
             st.metric(
                 "목표 달성률",
                 f"{achievement_rate:.1f}%"
             )
 
-        # 진행률은 최대 100%
-        progress_rate = min(achievement_rate / 100, 1.0)
+        # 진행률 막대는 최대 100%
+        progress_rate = min(
+            achievement_rate / 100,
+            1.0
+        )
 
         st.progress(progress_rate)
 
+        # 목표 달성 여부 표시
         if achievement_rate >= 100:
+
             st.success(
                 f"생산 목표를 달성했습니다! "
                 f"현재 달성률은 {achievement_rate:.1f}%입니다."
             )
+
         else:
+
             remaining = target - actual
+
             st.info(
                 f"목표 달성까지 {remaining:,}개의 "
                 "추가 생산이 필요합니다."
@@ -316,7 +426,7 @@ if menu == "생산 현황":
         st.divider()
 
         # ------------------------------------------
-        # 5-5. 설비별 생산량 TOP 10 그래프
+        # 5-6. 설비별 생산량 TOP 10 그래프
         # ------------------------------------------
 
         st.subheader("설비별 생산량 분석")
@@ -326,17 +436,22 @@ if menu == "생산 현황":
             "상위 10개 설비를 비교합니다."
         )
 
+        # 설비별 생산량 합계
         machine_data = (
-            filtered.groupby("machine_id")["production_count"]
+            filtered.groupby("machine_id")[
+                "production_count"
+            ]
             .sum()
             .reset_index()
         )
 
+        # 생산량 내림차순 정렬
         machine_data = machine_data.sort_values(
             "production_count",
             ascending=False
         )
 
+        # 상위 10개
         top10 = machine_data.head(10).copy()
 
         if not top10.empty:
@@ -353,11 +468,13 @@ if menu == "생산 현황":
                 }
             )
 
+            # 생산량 순서 유지
             fig.update_xaxes(
                 categoryorder="array",
                 categoryarray=top10["machine_id"].tolist()
             )
 
+            # 막대 위 숫자 표시
             fig.update_traces(
                 texttemplate="%{y:,.0f}",
                 textposition="outside",
@@ -368,18 +485,31 @@ if menu == "생산 현황":
                 )
             )
 
+            # 그래프 디자인
             fig.update_layout(
                 xaxis_title="설비번호",
                 yaxis_title="총생산량",
                 height=500,
-                margin=dict(l=30, r=30, t=70, b=30),
-                yaxis=dict(rangemode="tozero")
+                margin=dict(
+                    l=30,
+                    r=30,
+                    t=70,
+                    b=30
+                ),
+                yaxis=dict(
+                    rangemode="tozero"
+                )
             )
 
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
 
-            # 생산량 TOP 10 데이터 표
-            st.write("**설비별 생산량 TOP 10 데이터**")
+            # 설비별 생산량 TOP 10 데이터 표
+            st.write(
+                "**설비별 생산량 TOP 10 데이터**"
+            )
 
             top10_table = top10.rename(
                 columns={
@@ -394,12 +524,15 @@ if menu == "생산 현황":
             )
 
         else:
-            st.warning("설비별 생산량 데이터가 없습니다.")
+
+            st.warning(
+                "설비별 생산량 데이터가 없습니다."
+            )
 
         st.divider()
 
         # ------------------------------------------
-        # 5-6. CSV 데이터 정보
+        # 5-7. CSV 데이터 정보
         # ------------------------------------------
 
         st.subheader("CSV 데이터 정보")
@@ -407,18 +540,23 @@ if menu == "생산 현황":
         col1, col2 = st.columns(2)
 
         with col1:
+
             st.metric(
                 "전체 데이터 개수",
                 f"{len(df):,}건"
             )
 
         with col2:
+
             st.metric(
                 "전체 컬럼 개수",
                 f"{len(df.columns)}개"
             )
 
-        # 전체 데이터 기록 기간
+        # ------------------------------------------
+        # 5-8. 전체 데이터 기록 기간
+        # ------------------------------------------
+
         st.subheader("전체 데이터 기록 기간")
 
         valid_dates = df["timestamp"].dropna()
@@ -431,23 +569,33 @@ if menu == "생산 현황":
             col1, col2 = st.columns(2)
 
             with col1:
+
                 st.write("**데이터 시작 시간**")
+
                 st.write(
                     start_time.strftime("%Y-%m-%d %H:%M")
                 )
 
             with col2:
+
                 st.write("**데이터 종료 시간**")
+
                 st.write(
                     end_time.strftime("%Y-%m-%d %H:%M")
                 )
 
         else:
-            st.warning("유효한 생산 시간 데이터가 없습니다.")
+
+            st.warning(
+                "유효한 생산 시간 데이터가 없습니다."
+            )
 
         st.divider()
 
-        # 생산 기록 조회
+        # ------------------------------------------
+        # 5-9. 생산 기록 조회
+        # ------------------------------------------
+
         st.subheader("선택한 조건의 생산 기록")
 
         st.dataframe(
@@ -456,7 +604,10 @@ if menu == "생산 현황":
         )
 
     else:
-        st.warning("CSV 파일을 업로드하면 생산지표가 표시됩니다.")
+
+        st.warning(
+            "CSV 파일을 업로드하면 생산지표가 표시됩니다."
+        )
 
 
 # ==================================================
@@ -467,7 +618,9 @@ elif menu == "품질 관리":
 
     st.header("품질 관리")
 
-    st.write("제품의 품질과 불량률을 확인하는 화면입니다.")
+    st.write(
+        "제품의 품질과 불량률을 확인하는 화면입니다."
+    )
 
     if df is not None:
 
@@ -477,26 +630,49 @@ elif menu == "품질 관리":
 
         st.subheader("전체 품질 현황")
 
-        quality_total = int(df["production_count"].sum())
-        quality_defect = int(df["defect_count"].sum())
+        quality_total = int(
+            df["production_count"].sum()
+        )
 
-        # 전체 불량률
+        quality_defect = int(
+            df["defect_count"].sum()
+        )
+
+        # 전체 불량률 계산
         if quality_total > 0:
-            quality_rate = quality_defect / quality_total * 100
+
+            quality_rate = (
+                quality_defect / quality_total * 100
+            )
+
             quality_rate_text = f"{quality_rate:.2f}%"
+
         else:
+
             quality_rate_text = "계산 불가"
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.metric("전체 생산량", f"{quality_total:,}개")
+
+            st.metric(
+                "전체 생산량",
+                f"{quality_total:,}개"
+            )
 
         with col2:
-            st.metric("전체 불량 수량", f"{quality_defect:,}개")
+
+            st.metric(
+                "전체 불량 수량",
+                f"{quality_defect:,}개"
+            )
 
         with col3:
-            st.metric("전체 불량률", quality_rate_text)
+
+            st.metric(
+                "전체 불량률",
+                quality_rate_text
+            )
 
         st.divider()
 
@@ -511,7 +687,7 @@ elif menu == "품질 관리":
             "설비별 불량률을 계산합니다."
         )
 
-        # 설비번호별 생산량 및 불량 수량 합계
+        # 설비별 생산량과 불량 수량 합계
         quality_data = (
             df.groupby("machine_id")[
                 ["production_count", "defect_count"]
@@ -520,7 +696,7 @@ elif menu == "품질 관리":
             .reset_index()
         )
 
-        # 설비별 불량률
+        # 설비별 불량률 계산
         quality_data["defect_rate"] = (
             quality_data["defect_count"]
             /
@@ -531,16 +707,17 @@ elif menu == "품질 관리":
         )
 
         # ------------------------------------------
-        # 6-3. 품질 경고 기준
+        # 6-3. 품질 경고 기준 설정
         # ------------------------------------------
 
         st.subheader("품질 경고 기준 설정")
 
         st.write(
-            "허용 불량률을 설정하면 설비별 품질 상태를 "
-            "자동으로 판정합니다."
+            "허용 불량률을 설정하면 설비별 "
+            "품질 상태를 자동으로 판정합니다."
         )
 
+        # 허용 불량률 슬라이더
         allowed_rate = st.slider(
             "허용 불량률 (%)",
             min_value=0.0,
@@ -553,10 +730,10 @@ elif menu == "품질 관리":
             f"**현재 허용 불량률: {allowed_rate:.1f}%**"
         )
 
-        # 기본값: 계산 불가
+        # 기본 상태
         quality_data["quality_status"] = "계산 불가"
 
-        # 정상: 생산량 > 0, 불량률 <= 허용 기준
+        # 정상 조건
         normal_condition = (
             (quality_data["production_count"] > 0)
             &
@@ -564,10 +741,11 @@ elif menu == "품질 관리":
         )
 
         quality_data.loc[
-            normal_condition, "quality_status"
+            normal_condition,
+            "quality_status"
         ] = "정상"
 
-        # 경고: 생산량 > 0, 불량률 > 허용 기준
+        # 경고 조건
         warning_condition = (
             (quality_data["production_count"] > 0)
             &
@@ -575,7 +753,8 @@ elif menu == "품질 관리":
         )
 
         quality_data.loc[
-            warning_condition, "quality_status"
+            warning_condition,
+            "quality_status"
         ] = "경고"
 
         # 상태별 설비 개수
@@ -591,26 +770,42 @@ elif menu == "품질 관리":
             (quality_data["quality_status"] == "계산 불가").sum()
         )
 
+        # 품질 상태 표시
         st.subheader("품질 상태 현황")
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.metric("정상 설비", f"{normal_count:,}개")
+
+            st.metric(
+                "정상 설비",
+                f"{normal_count:,}개"
+            )
 
         with col2:
-            st.metric("경고 설비", f"{warning_count:,}개")
+
+            st.metric(
+                "경고 설비",
+                f"{warning_count:,}개"
+            )
 
         with col3:
-            st.metric("계산 불가 설비", f"{unknown_count:,}개")
+
+            st.metric(
+                "계산 불가 설비",
+                f"{unknown_count:,}개"
+            )
 
         # 경고 메시지
         if warning_count > 0:
+
             st.error(
                 f"품질 경고: 허용 불량률 {allowed_rate:.1f}%를 "
                 f"초과한 설비가 {warning_count:,}개 있습니다."
             )
+
         else:
+
             st.success(
                 "정상: 허용 불량률을 초과한 설비가 없습니다."
             )
@@ -625,7 +820,7 @@ elif menu == "품질 관리":
 
         quality_table = quality_data.copy()
 
-        # 숫자를 문자열로 변경해 표시
+        # 불량률 표시 형식
         quality_table["defect_rate"] = (
             quality_table["defect_rate"].apply(
                 lambda x: f"{x:.2f}%"
@@ -634,6 +829,7 @@ elif menu == "품질 관리":
             )
         )
 
+        # 컬럼 이름 변경
         quality_table = quality_table.rename(
             columns={
                 "machine_id": "설비번호",
@@ -644,6 +840,7 @@ elif menu == "품질 관리":
             }
         )
 
+        # 정수 변환
         quality_table["총생산량"] = (
             quality_table["총생산량"].astype(int)
         )
@@ -687,10 +884,12 @@ elif menu == "품질 관리":
             "불량률이 높은 상위 10개 설비를 비교합니다."
         )
 
+        # 생산량이 0인 설비 제외
         quality_graph = quality_data[
             quality_data["production_count"] > 0
         ].copy()
 
+        # 불량률 높은 순서로 정렬
         quality_graph = quality_graph.sort_values(
             "defect_rate",
             ascending=False
@@ -733,7 +932,12 @@ elif menu == "품질 관리":
                 xaxis_title="설비번호",
                 yaxis_title="불량률(%)",
                 height=500,
-                margin=dict(l=30, r=30, t=70, b=30),
+                margin=dict(
+                    l=30,
+                    r=30,
+                    t=70,
+                    b=30
+                ),
                 yaxis=dict(
                     rangemode="tozero",
                     ticksuffix="%"
@@ -746,7 +950,10 @@ elif menu == "품질 관리":
             )
 
         else:
-            st.warning("불량률을 계산할 수 있는 설비가 없습니다.")
+
+            st.warning(
+                "불량률을 계산할 수 있는 설비가 없습니다."
+            )
 
         st.divider()
 
@@ -761,13 +968,16 @@ elif menu == "품질 관리":
             "불량률의 변화를 확인합니다."
         )
 
+        # 원본 데이터 복사
         daily_df = df.copy()
 
-        # timestamp에서 날짜 추출
+        # 날짜 추출
         daily_df["date"] = daily_df["timestamp"].dt.date
 
         # 날짜가 없는 기록 제외
-        daily_df = daily_df.dropna(subset=["date"])
+        daily_df = daily_df.dropna(
+            subset=["date"]
+        )
 
         # 날짜별 합계
         daily_data = (
@@ -788,8 +998,13 @@ elif menu == "품질 관리":
             * 100
         )
 
-        daily_data = daily_data.sort_values("date")
+        # 날짜순 정렬
+        daily_data = daily_data.sort_values(
+            "date",
+            ascending=True
+        )
 
+        # 날짜 형식 변환
         daily_data["date"] = pd.to_datetime(
             daily_data["date"]
         )
@@ -820,7 +1035,12 @@ elif menu == "품질 관리":
                 xaxis_title="날짜",
                 yaxis_title="불량률(%)",
                 height=500,
-                margin=dict(l=30, r=30, t=70, b=30),
+                margin=dict(
+                    l=30,
+                    r=30,
+                    t=70,
+                    b=30
+                ),
                 yaxis=dict(
                     rangemode="tozero",
                     ticksuffix="%"
@@ -836,13 +1056,16 @@ elif menu == "품질 관리":
                 use_container_width=True
             )
 
+            # 생산량이 0인 날짜 안내
             if (daily_data["production_count"] == 0).any():
+
                 st.info(
                     "생산량이 0인 날짜는 불량률을 "
                     "계산할 수 없어 점이 표시되지 않습니다."
                 )
 
         else:
+
             st.warning(
                 "날짜별 불량률을 분석할 데이터가 없습니다."
             )
@@ -872,12 +1095,12 @@ elif menu == "품질 관리":
             f"**현재 최소 생산량 기준: {min_production:,}개**"
         )
 
-        # 생산량 기준 이상인 설비만 선택
+        # 기준 이상인 설비만 선택
         ranking_data = quality_data[
             quality_data["production_count"] >= min_production
         ].copy()
 
-        # 불량률 오름차순 정렬
+        # 불량률 오름차순
         ranking_data = ranking_data.sort_values(
             ["defect_rate", "machine_id"],
             ascending=[True, True]
@@ -915,6 +1138,7 @@ elif menu == "품질 관리":
             }
         )
 
+        # 컬럼 순서
         ranking_table = ranking_table[
             [
                 "순위",
@@ -926,6 +1150,7 @@ elif menu == "품질 관리":
             ]
         ]
 
+        # 정수 변환
         ranking_table["총생산량"] = (
             ranking_table["총생산량"].astype(int)
         )
@@ -935,7 +1160,7 @@ elif menu == "품질 관리":
         )
 
         # ------------------------------------------
-        # 6-8. 전체 품질 순위표
+        # 6-8. 전체 설비 품질 순위표
         # ------------------------------------------
 
         st.subheader("전체 설비 품질 순위표")
@@ -961,6 +1186,7 @@ elif menu == "품질 관리":
             )
 
         else:
+
             st.warning(
                 "최소 생산량 기준을 만족하는 설비가 없습니다."
             )
@@ -968,7 +1194,7 @@ elif menu == "품질 관리":
         st.divider()
 
         # ------------------------------------------
-        # 6-9. 품질 우수 TOP 10
+        # 6-9. 품질 우수 설비 TOP 10
         # ------------------------------------------
 
         st.subheader("품질 우수 설비 TOP 10")
@@ -1001,7 +1227,10 @@ elif menu == "품질 관리":
             )
 
         else:
-            st.info("표시할 품질 우수 설비가 없습니다.")
+
+            st.info(
+                "표시할 품질 우수 설비가 없습니다."
+            )
 
         st.divider()
 
@@ -1050,7 +1279,10 @@ elif menu == "품질 관리":
             )
 
         else:
-            st.success("생산량이 0인 설비가 없습니다.")
+
+            st.success(
+                "생산량이 0인 설비가 없습니다."
+            )
 
         # 최소 생산량 기준에 미달하는 설비
         st.write("**최소 생산량 기준 미달 설비**")
@@ -1101,16 +1333,20 @@ elif menu == "품질 관리":
             )
 
         else:
+
             st.success(
                 "최소 생산량 기준에 미달하는 설비가 없습니다."
             )
 
     else:
-        st.warning("CSV 파일을 업로드하면 품질 분석 결과가 표시됩니다.")
+
+        st.warning(
+            "CSV 파일을 업로드하면 품질 분석 결과가 표시됩니다."
+        )
 
 
 # ==================================================
-# 7. 설비 모니터링 메뉴 (이번에 추가)
+# 7. 설비 모니터링 메뉴
 # ==================================================
 
 elif menu == "설비 모니터링":
@@ -1130,7 +1366,7 @@ elif menu == "설비 모니터링":
 
         st.subheader("설비 선택")
 
-        # machine_id 컬럼에서 설비번호 가져오기
+        # machine_id에서 설비번호 목록 가져오기
         machine_list = sorted(
             df["machine_id"]
             .dropna()
@@ -1159,21 +1395,29 @@ elif menu == "설비 모니터링":
         # 7-3. 선택한 설비의 데이터 가져오기
         # ------------------------------------------
 
-        # 선택한 설비번호와 일치하는 데이터만 가져오기
+        # 선택한 설비의 기록만 가져오기
         machine_df = df[
             df["machine_id"].astype(str)
             == selected_machine_monitor
         ].copy()
 
-        # 날짜가 없는 기록은 최신 기록 판단에서 제외
+        # timestamp가 없는 기록 제외
         machine_df = machine_df.dropna(
             subset=["timestamp"]
         )
 
         # ------------------------------------------
-        # 7-4. 가장 최근 기록 찾기
+        # 7-4. 시간순 정렬
         # ------------------------------------------
 
+        # 시간 기준 오름차순 정렬
+        # 과거 기록부터 최근 기록 순서로 배치
+        machine_df = machine_df.sort_values(
+            "timestamp",
+            ascending=True
+        )
+
+        # 유효한 기록이 없는 경우
         if machine_df.empty:
 
             st.warning(
@@ -1182,39 +1426,30 @@ elif menu == "설비 모니터링":
 
         else:
 
-            # timestamp를 최근 날짜부터 정렬
-            machine_df = machine_df.sort_values(
-                "timestamp",
-                ascending=False
-            )
+            # ======================================
+            # 7-5. 선택한 설비의 최신 기록
+            # ======================================
 
-            # 가장 첫 번째 행이 최신 기록
-            latest = machine_df.iloc[0]
+            # 시간순으로 정렬되어 있으므로
+            # 마지막 행이 가장 최근 기록
+            latest = machine_df.iloc[-1]
 
-            # --------------------------------------
-            # 7-5. 최신 기록 정보 가져오기
-            # --------------------------------------
-
-            # 설비번호
+            # 최근 설비 정보 가져오기
             latest_machine = latest["machine_id"]
 
-            # 최근 공정 온도
             latest_temperature = latest["temperature"]
 
-            # 최근 습도
             latest_humidity = latest["humidity"]
 
-            # 최근 기록 시간
             latest_time = latest["timestamp"]
 
-            # 최근 가동 상태
             latest_status = latest["operating_status"]
 
-            # --------------------------------------
-            # 7-6. 설비번호 표시
-            # --------------------------------------
-
             st.divider()
+
+            # --------------------------------------
+            # 7-6. 설비 최신 상태 표시
+            # --------------------------------------
 
             st.subheader("설비 최신 상태")
 
@@ -1222,16 +1457,12 @@ elif menu == "설비 모니터링":
                 f"**선택한 설비번호: {latest_machine}**"
             )
 
-            # --------------------------------------
-            # 7-7. 온도와 습도 표시
-            # --------------------------------------
-
-            # 두 개의 열 생성
+            # 온도와 습도를 가로로 배치
             col1, col2 = st.columns(2)
 
             with col1:
 
-                # 온도 데이터가 있는 경우
+                # 최근 온도 표시
                 if pd.notna(latest_temperature):
 
                     st.metric(
@@ -1248,7 +1479,7 @@ elif menu == "설비 모니터링":
 
             with col2:
 
-                # 습도 데이터가 있는 경우
+                # 최근 습도 표시
                 if pd.notna(latest_humidity):
 
                     st.metric(
@@ -1266,7 +1497,7 @@ elif menu == "설비 모니터링":
             st.divider()
 
             # --------------------------------------
-            # 7-8. 최근 기록 시간 표시
+            # 7-7. 최근 기록 정보
             # --------------------------------------
 
             st.subheader("최근 기록 정보")
@@ -1279,13 +1510,9 @@ elif menu == "설비 모니터링":
                 )
             )
 
-            # --------------------------------------
-            # 7-9. 최근 가동 상태 표시
-            # --------------------------------------
-
             st.write("**최근 가동 상태**")
 
-            # 가동 상태가 비어 있는 경우 처리
+            # 가동 상태가 없는 경우 처리
             if pd.notna(latest_status):
 
                 st.write(str(latest_status))
@@ -1293,6 +1520,197 @@ elif menu == "설비 모니터링":
             else:
 
                 st.write("데이터 없음")
+
+            st.divider()
+
+            # ======================================
+            # 7-8. 시간별 온도 변화 그래프 (추가)
+            # ======================================
+
+            st.subheader("시간별 온도 변화")
+
+            st.write(
+                "선택한 설비의 시간에 따른 "
+                "공정 온도 변화를 확인합니다."
+            )
+
+            # 온도 데이터가 없는 기록 제외
+            temperature_data = machine_df.dropna(
+                subset=["temperature"]
+            ).copy()
+
+            # 온도 데이터가 있는 경우
+            if not temperature_data.empty:
+
+                # ----------------------------------
+                # ① Plotly 온도 선그래프 생성
+                # ----------------------------------
+
+                fig_temp = px.line(
+                    temperature_data,
+                    x="timestamp",
+                    y="temperature",
+                    title="시간별 온도 변화",
+                    markers=True,
+                    labels={
+                        "timestamp": "기록 시간",
+                        "temperature": "공정 온도(℃)"
+                    }
+                )
+
+                # ----------------------------------
+                # ② 40℃ 기준선 추가
+                # ----------------------------------
+
+                fig_temp.add_hline(
+                    y=40,
+                    line_color="red",
+                    line_dash="dash",
+                    line_width=2
+                )
+
+                # ----------------------------------
+                # ③ 마우스 정보 설정
+                # ----------------------------------
+
+                fig_temp.update_traces(
+                    hovertemplate=(
+                        "기록 시간: %{x|%Y-%m-%d %H:%M:%S}<br>"
+                        "공정 온도: %{y:.2f}℃"
+                        "<extra></extra>"
+                    )
+                )
+
+                # ----------------------------------
+                # ④ 그래프 디자인
+                # ----------------------------------
+
+                fig_temp.update_layout(
+                    xaxis_title="기록 시간",
+                    yaxis_title="공정 온도(℃)",
+                    height=500,
+                    margin=dict(
+                        l=30,
+                        r=30,
+                        t=70,
+                        b=30
+                    ),
+                    hovermode="closest"
+                )
+
+                # 시간 표시 형식
+                fig_temp.update_xaxes(
+                    tickformat="%m-%d %H:%M"
+                )
+
+                # ----------------------------------
+                # ⑤ Streamlit에 그래프 출력
+                # ----------------------------------
+
+                st.plotly_chart(
+                    fig_temp,
+                    use_container_width=True
+                )
+
+                # 기준선 설명
+                st.caption(
+                    "빨간색 점선은 공정 온도 40℃ 기준선입니다."
+                )
+
+            else:
+
+                st.warning(
+                    "선택한 설비에 온도 데이터가 없습니다."
+                )
+
+            st.divider()
+
+            # ======================================
+            # 7-9. 시간별 습도 변화 그래프 (추가)
+            # ======================================
+
+            st.subheader("시간별 습도 변화")
+
+            st.write(
+                "선택한 설비의 시간에 따른 "
+                "습도 변화를 확인합니다."
+            )
+
+            # 습도 데이터가 없는 기록 제외
+            humidity_data = machine_df.dropna(
+                subset=["humidity"]
+            ).copy()
+
+            # 습도 데이터가 있는 경우
+            if not humidity_data.empty:
+
+                # ----------------------------------
+                # ① Plotly 습도 선그래프 생성
+                # ----------------------------------
+
+                fig_humidity = px.line(
+                    humidity_data,
+                    x="timestamp",
+                    y="humidity",
+                    title="시간별 습도 변화",
+                    markers=True,
+                    labels={
+                        "timestamp": "기록 시간",
+                        "humidity": "습도(%)"
+                    }
+                )
+
+                # ----------------------------------
+                # ② 마우스 정보 설정
+                # ----------------------------------
+
+                fig_humidity.update_traces(
+                    hovertemplate=(
+                        "기록 시간: %{x|%Y-%m-%d %H:%M:%S}<br>"
+                        "습도: %{y:.2f}%"
+                        "<extra></extra>"
+                    )
+                )
+
+                # ----------------------------------
+                # ③ 그래프 디자인
+                # ----------------------------------
+
+                fig_humidity.update_layout(
+                    xaxis_title="기록 시간",
+                    yaxis_title="습도(%)",
+                    height=500,
+                    margin=dict(
+                        l=30,
+                        r=30,
+                        t=70,
+                        b=30
+                    ),
+                    hovermode="closest",
+                    yaxis=dict(
+                        ticksuffix="%"
+                    )
+                )
+
+                # 시간 표시 형식
+                fig_humidity.update_xaxes(
+                    tickformat="%m-%d %H:%M"
+                )
+
+                # ----------------------------------
+                # ④ Streamlit에 그래프 출력
+                # ----------------------------------
+
+                st.plotly_chart(
+                    fig_humidity,
+                    use_container_width=True
+                )
+
+            else:
+
+                st.warning(
+                    "선택한 설비에 습도 데이터가 없습니다."
+                )
 
     else:
 
