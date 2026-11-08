@@ -84,7 +84,7 @@ if df is not None:
 
         st.stop()
 
-    # 생산 시간을 날짜와 시간 형식으로 변환
+    # 생산 시간을 날짜·시간 형식으로 변환
     df["timestamp"] = pd.to_datetime(
         df["timestamp"],
         errors="coerce"
@@ -104,7 +104,7 @@ if df is not None:
             errors="coerce"
         )
 
-    # 생산량과 불량 수량에 잘못된 값이 있는지 확인
+    # 생산량과 불량 수량의 결측값 확인
     if df[["production_count", "defect_count"]].isna().any().any():
 
         st.error("생산량 또는 불량 수량에 잘못된 값이 있습니다.")
@@ -126,7 +126,6 @@ if df is not None:
     if df["timestamp"].isna().any():
 
         st.warning("일부 생산 시간이 날짜 형식으로 변환되지 않았습니다.")
-
 
 # --------------------------------------------------
 # 5. 사이드바 메뉴
@@ -154,21 +153,125 @@ if menu == "생산 현황":
 
     if df is not None:
 
+        # ==========================================
+        # 6-1. 날짜·설비 필터 (새로운 기능)
+        # ==========================================
+
+        st.subheader("생산 데이터 검색 조건")
+
+        # 설비번호 목록 가져오기
+        machines = ["전체"] + sorted(
+            df["machine_id"].dropna().unique().tolist()
+        )
+
+        # 설비 선택 메뉴
+        selected_machine = st.selectbox(
+            "설비번호 선택",
+            machines
+        )
+
+        # 날짜가 올바른 데이터만 날짜 필터에 사용
+        valid_dates = df["timestamp"].dropna()
+
+        if valid_dates.empty:
+
+            st.error("검색할 수 있는 날짜 데이터가 없습니다.")
+            st.stop()
+
+        # 데이터의 시작 날짜와 종료 날짜
+        min_date = valid_dates.min().date()
+        max_date = valid_dates.max().date()
+
+        # 날짜 선택 메뉴를 두 개의 열로 배치
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            start_date = st.date_input(
+                "시작 날짜",
+                value=min_date
+            )
+
+        with col2:
+
+            end_date = st.date_input(
+                "종료 날짜",
+                value=max_date
+            )
+
         # ------------------------------------------
-        # 6-1. 주요 생산지표 계산
+        # 6-2. 날짜 조건 검사
         # ------------------------------------------
 
-        # 전체 생산량
-        total = int(df["production_count"].sum())
+        # 시작 날짜가 종료 날짜보다 늦은 경우
+        if start_date > end_date:
 
-        # 불량 제품 수
-        defect = int(df["defect_count"].sum())
+            st.error(
+                "시작 날짜가 종료 날짜보다 늦습니다. "
+                "날짜를 다시 선택해주세요."
+            )
+
+            st.stop()
+
+        # ==========================================
+        # 6-3. 데이터 필터링 (새로운 기능)
+        # ==========================================
+
+        # 원본 데이터를 변경하지 않기 위해 복사
+        filtered = df.copy()
+
+        # 날짜 조건 적용
+        filtered = filtered[
+            (filtered["timestamp"].dt.date >= start_date)
+            &
+            (filtered["timestamp"].dt.date <= end_date)
+        ].copy()
+
+        # 특정 설비를 선택한 경우
+        if selected_machine != "전체":
+
+            filtered = filtered[
+                filtered["machine_id"] == selected_machine
+            ].copy()
+
+        # ------------------------------------------
+        # 6-4. 검색 결과 개수 표시
+        # ------------------------------------------
+
+        st.write(
+            f"**선택한 조건의 생산 기록: {len(filtered):,}건**"
+        )
+
+        # 조건에 맞는 데이터가 없는 경우
+        if filtered.empty:
+
+            st.warning(
+                "선택한 날짜와 설비에 해당하는 데이터가 없습니다."
+            )
+
+            st.stop()
+
+        st.divider()
+
+        # ==========================================
+        # 6-5. 주요 생산지표 계산
+        # ==========================================
+
+        # 선택한 데이터의 전체 생산량
+        total = int(
+            filtered["production_count"].sum()
+        )
+
+        # 선택한 데이터의 불량 제품 수
+        defect = int(
+            filtered["defect_count"].sum()
+        )
 
         # 정상 제품 수
         normal = total - defect
 
         # 전체 불량률
-        # 생산량이 0이면 0으로 나누는 오류 방지
+        # 생산량이 0인 경우 오류 방지
         defect_rate = (
             defect / total * 100
             if total > 0
@@ -176,11 +279,13 @@ if menu == "생산 현황":
         )
 
         # 평균 공정 온도
-        avg_temperature = df["temperature"].mean()
+        avg_temperature = filtered["temperature"].mean()
 
         # ------------------------------------------
-        # 6-2. 주요 생산지표 카드
+        # 6-6. 주요 생산지표 카드
         # ------------------------------------------
+
+        st.subheader("주요 생산지표")
 
         col1, col2, col3, col4 = st.columns(4)
 
@@ -215,7 +320,7 @@ if menu == "생산 현황":
         st.divider()
 
         # ------------------------------------------
-        # 6-3. 평균 공정 온도
+        # 6-7. 평균 공정 온도
         # ------------------------------------------
 
         if pd.notna(avg_temperature):
@@ -232,39 +337,39 @@ if menu == "생산 현황":
                 "데이터 없음"
             )
 
-        st.success("CSV 데이터를 이용하여 생산지표를 자동 계산했습니다.")
+        st.success("선택한 조건으로 생산지표를 계산했습니다.")
 
         st.divider()
 
         # ==========================================
-        # 6-4. 설비별 생산량 TOP 10 그래프 (추가)
+        # 6-8. 설비별 생산량 TOP 10 그래프
         # ==========================================
 
         st.subheader("설비별 생산량 분석")
 
         st.write(
-            "생산량이 가장 많은 상위 10개 설비를 비교합니다."
+            "선택한 조건에서 생산량이 많은 상위 10개 설비입니다."
         )
 
-        # 1. 설비번호별 생산량 합계 계산
+        # 선택한 데이터에서 설비별 생산량 계산
         machine_data = (
-            df.groupby("machine_id")["production_count"]
+            filtered.groupby("machine_id")["production_count"]
             .sum()
             .reset_index()
         )
 
-        # 2. 생산량이 많은 순서로 정렬
+        # 생산량이 많은 순서로 정렬
         machine_data = machine_data.sort_values(
             "production_count",
             ascending=False
         )
 
-        # 3. 상위 10개 설비 선택
+        # 상위 10개 설비 선택
         top10 = machine_data.head(10).copy()
 
-        # 4. 그래프 생성
         if not top10.empty:
 
+            # Plotly 막대그래프
             fig = px.bar(
                 top10,
                 x="machine_id",
@@ -277,13 +382,13 @@ if menu == "생산 현황":
                 }
             )
 
-            # 5. 생산량이 많은 순서 유지
+            # 생산량 순서 유지
             fig.update_xaxes(
                 categoryorder="array",
                 categoryarray=top10["machine_id"].tolist()
             )
 
-            # 6. 막대 위에 생산량 표시
+            # 막대 위 숫자와 마우스 정보 표시
             fig.update_traces(
                 texttemplate="%{y:,.0f}",
                 textposition="outside",
@@ -294,7 +399,7 @@ if menu == "생산 현황":
                 )
             )
 
-            # 7. 그래프 디자인 설정
+            # 그래프 디자인
             fig.update_layout(
                 xaxis_title="설비번호",
                 yaxis_title="총생산량",
@@ -310,7 +415,7 @@ if menu == "생산 현황":
                 )
             )
 
-            # 8. Streamlit 화면에 그래프 표시
+            # 그래프 표시
             st.plotly_chart(
                 fig,
                 use_container_width=True
@@ -322,7 +427,6 @@ if menu == "생산 현황":
 
             st.write("**설비별 생산량 TOP 10 데이터**")
 
-            # 표의 컬럼명을 한글로 변경
             top10_table = top10.rename(
                 columns={
                     "machine_id": "설비번호",
@@ -342,11 +446,12 @@ if menu == "생산 현황":
         st.divider()
 
         # ------------------------------------------
-        # 6-5. CSV 데이터 정보
+        # 6-9. CSV 데이터 정보
         # ------------------------------------------
 
         st.subheader("CSV 데이터 정보")
 
+        # 원본 CSV 정보는 그대로 유지
         total_rows = len(df)
         total_columns = len(df.columns)
 
@@ -367,15 +472,17 @@ if menu == "생산 현황":
             )
 
         # ------------------------------------------
-        # 6-6. 데이터 기록 기간
+        # 6-10. 데이터 기록 기간
         # ------------------------------------------
 
-        st.subheader("데이터 기록 기간")
+        st.subheader("전체 데이터 기록 기간")
 
-        if df["timestamp"].notna().any():
+        valid_dates = df["timestamp"].dropna()
 
-            start_time = df["timestamp"].min()
-            end_time = df["timestamp"].max()
+        if not valid_dates.empty:
+
+            start_time = valid_dates.min()
+            end_time = valid_dates.max()
 
             col1, col2 = st.columns(2)
 
@@ -402,13 +509,13 @@ if menu == "생산 현황":
         st.divider()
 
         # ------------------------------------------
-        # 6-7. 처음 10개 데이터 표시
+        # 6-11. 선택한 데이터 처음 10개 표시
         # ------------------------------------------
 
-        st.subheader("처음 10개 생산 기록")
+        st.subheader("선택한 조건의 생산 기록")
 
         st.dataframe(
-            df.head(10),
+            filtered.head(10),
             use_container_width=True
         )
 
