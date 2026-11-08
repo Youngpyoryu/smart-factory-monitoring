@@ -1,6 +1,7 @@
 
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import os
 
 # --------------------------------------------------
@@ -83,7 +84,7 @@ if df is not None:
 
         st.stop()
 
-    # 생산 시간을 날짜·시간 형식으로 변환
+    # 생산 시간을 날짜와 시간 형식으로 변환
     df["timestamp"] = pd.to_datetime(
         df["timestamp"],
         errors="coerce"
@@ -126,6 +127,7 @@ if df is not None:
 
         st.warning("일부 생산 시간이 날짜 형식으로 변환되지 않았습니다.")
 
+
 # --------------------------------------------------
 # 5. 사이드바 메뉴
 # --------------------------------------------------
@@ -150,7 +152,6 @@ if menu == "생산 현황":
 
     st.write("공장의 주요 생산지표를 확인합니다.")
 
-    # CSV 데이터가 있는 경우
     if df is not None:
 
         # ------------------------------------------
@@ -167,7 +168,7 @@ if menu == "생산 현황":
         normal = total - defect
 
         # 전체 불량률
-        # 생산량이 0이면 0으로 나누지 않도록 처리
+        # 생산량이 0이면 0으로 나누는 오류 방지
         defect_rate = (
             defect / total * 100
             if total > 0
@@ -235,16 +236,118 @@ if menu == "생산 현황":
 
         st.divider()
 
+        # ==========================================
+        # 6-4. 설비별 생산량 TOP 10 그래프 (추가)
+        # ==========================================
+
+        st.subheader("설비별 생산량 분석")
+
+        st.write(
+            "생산량이 가장 많은 상위 10개 설비를 비교합니다."
+        )
+
+        # 1. 설비번호별 생산량 합계 계산
+        machine_data = (
+            df.groupby("machine_id")["production_count"]
+            .sum()
+            .reset_index()
+        )
+
+        # 2. 생산량이 많은 순서로 정렬
+        machine_data = machine_data.sort_values(
+            "production_count",
+            ascending=False
+        )
+
+        # 3. 상위 10개 설비 선택
+        top10 = machine_data.head(10).copy()
+
+        # 4. 그래프 생성
+        if not top10.empty:
+
+            fig = px.bar(
+                top10,
+                x="machine_id",
+                y="production_count",
+                title="설비별 생산량 TOP 10",
+                text="production_count",
+                labels={
+                    "machine_id": "설비번호",
+                    "production_count": "총생산량"
+                }
+            )
+
+            # 5. 생산량이 많은 순서 유지
+            fig.update_xaxes(
+                categoryorder="array",
+                categoryarray=top10["machine_id"].tolist()
+            )
+
+            # 6. 막대 위에 생산량 표시
+            fig.update_traces(
+                texttemplate="%{y:,.0f}",
+                textposition="outside",
+                hovertemplate=(
+                    "설비번호: %{x}<br>"
+                    "총생산량: %{y:,.0f}개"
+                    "<extra></extra>"
+                )
+            )
+
+            # 7. 그래프 디자인 설정
+            fig.update_layout(
+                xaxis_title="설비번호",
+                yaxis_title="총생산량",
+                height=500,
+                margin=dict(
+                    l=30,
+                    r=30,
+                    t=70,
+                    b=30
+                ),
+                yaxis=dict(
+                    rangemode="tozero"
+                )
+            )
+
+            # 8. Streamlit 화면에 그래프 표시
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
+
+            # --------------------------------------
+            # 설비별 생산량 TOP 10 데이터 표
+            # --------------------------------------
+
+            st.write("**설비별 생산량 TOP 10 데이터**")
+
+            # 표의 컬럼명을 한글로 변경
+            top10_table = top10.rename(
+                columns={
+                    "machine_id": "설비번호",
+                    "production_count": "총생산량"
+                }
+            )
+
+            st.dataframe(
+                top10_table.reset_index(drop=True),
+                use_container_width=True
+            )
+
+        else:
+
+            st.warning("설비별 생산량 데이터가 없습니다.")
+
+        st.divider()
+
         # ------------------------------------------
-        # 6-4. CSV 데이터 정보
+        # 6-5. CSV 데이터 정보
         # ------------------------------------------
 
         st.subheader("CSV 데이터 정보")
 
-        # 전체 데이터 개수
         total_rows = len(df)
-
-        # 전체 컬럼 개수
         total_columns = len(df.columns)
 
         col1, col2 = st.columns(2)
@@ -264,7 +367,7 @@ if menu == "생산 현황":
             )
 
         # ------------------------------------------
-        # 6-5. 데이터 기록 기간
+        # 6-6. 데이터 기록 기간
         # ------------------------------------------
 
         st.subheader("데이터 기록 기간")
@@ -299,7 +402,7 @@ if menu == "생산 현황":
         st.divider()
 
         # ------------------------------------------
-        # 6-6. 처음 10개 데이터 표시
+        # 6-7. 처음 10개 데이터 표시
         # ------------------------------------------
 
         st.subheader("처음 10개 생산 기록")
@@ -313,6 +416,7 @@ if menu == "생산 현황":
 
         st.warning("CSV 파일을 업로드하면 생산지표가 표시됩니다.")
 
+
 # --------------------------------------------------
 # 7. 품질 관리 메뉴
 # --------------------------------------------------
@@ -323,7 +427,10 @@ elif menu == "품질 관리":
 
     st.write("제품의 품질과 불량률을 확인하는 화면입니다.")
 
-    st.info("추후 설비별 불량률과 품질 경고 기능을 추가합니다.")
+    st.info(
+        "추후 설비별 불량률과 품질 경고 기능을 추가합니다."
+    )
+
 
 # --------------------------------------------------
 # 8. 설비 모니터링 메뉴
@@ -335,7 +442,10 @@ elif menu == "설비 모니터링":
 
     st.write("설비별 온도와 습도를 확인하는 화면입니다.")
 
-    st.info("추후 설비 선택과 온도 경고 기능을 추가합니다.")
+    st.info(
+        "추후 설비 선택과 온도 경고 기능을 추가합니다."
+    )
+
 
 # --------------------------------------------------
 # 9. 데이터 관리 메뉴
@@ -347,4 +457,6 @@ elif menu == "데이터 관리":
 
     st.write("생산 데이터를 조회하고 관리하는 화면입니다.")
 
-    st.info("추후 데이터 검색과 입력 기능을 추가합니다.")
+    st.info(
+        "추후 데이터 검색과 입력 기능을 추가합니다."
+    )
