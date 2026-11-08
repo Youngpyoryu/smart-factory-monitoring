@@ -78,7 +78,10 @@ if df is not None:
 
     if missing_columns:
 
-        st.error(f"CSV에 필요한 컬럼이 없습니다: {missing_columns}")
+        st.error(
+            f"CSV에 필요한 컬럼이 없습니다: {missing_columns}"
+        )
+
         st.stop()
 
     # 생산 시간을 날짜와 시간 형식으로 변환
@@ -667,9 +670,9 @@ elif menu == "품질 관리":
 
         st.divider()
 
-        # ==========================================
-        # 7-5. 설비별 불량률 TOP 10 그래프 (추가)
-        # ==========================================
+        # ------------------------------------------
+        # 7-5. 설비별 불량률 TOP 10 그래프
+        # ------------------------------------------
 
         st.subheader("설비별 불량률 TOP 10")
 
@@ -677,36 +680,23 @@ elif menu == "품질 관리":
             "불량률이 높은 상위 10개 설비를 비교합니다."
         )
 
-        # ------------------------------------------
-        # ① 생산량이 0인 설비 제외
-        # ------------------------------------------
-
-        # quality_data에는 숫자 형태의 불량률이 있음
+        # 생산량이 0인 설비 제외
         quality_graph = quality_data[
             quality_data["production_count"] > 0
         ].copy()
 
-        # ------------------------------------------
-        # ② 불량률이 높은 순서로 정렬
-        # ------------------------------------------
-
+        # 불량률이 높은 순서로 정렬
         quality_graph = quality_graph.sort_values(
             "defect_rate",
             ascending=False
         )
 
-        # ------------------------------------------
-        # ③ 상위 10개 설비 선택
-        # ------------------------------------------
-
+        # 상위 10개 설비 선택
         quality_top10 = quality_graph.head(10).copy()
-
-        # ------------------------------------------
-        # ④ Plotly 막대그래프 생성
-        # ------------------------------------------
 
         if not quality_top10.empty:
 
+            # Plotly 막대그래프 생성
             fig_quality = px.bar(
                 quality_top10,
                 x="machine_id",
@@ -719,10 +709,7 @@ elif menu == "품질 관리":
                 }
             )
 
-            # --------------------------------------
-            # ⑤ 불량률 내림차순 유지
-            # --------------------------------------
-
+            # 불량률 순서 유지
             fig_quality.update_xaxes(
                 categoryorder="array",
                 categoryarray=quality_top10[
@@ -730,10 +717,7 @@ elif menu == "품질 관리":
                 ].tolist()
             )
 
-            # --------------------------------------
-            # ⑥ 막대 위에 불량률 표시
-            # --------------------------------------
-
+            # 막대 위 불량률과 마우스 정보
             fig_quality.update_traces(
                 texttemplate="%{y:.2f}%",
                 textposition="outside",
@@ -744,10 +728,7 @@ elif menu == "품질 관리":
                 )
             )
 
-            # --------------------------------------
-            # ⑦ 그래프 디자인
-            # --------------------------------------
-
+            # 그래프 디자인
             fig_quality.update_layout(
                 xaxis_title="설비번호",
                 yaxis_title="불량률(%)",
@@ -764,10 +745,6 @@ elif menu == "품질 관리":
                 )
             )
 
-            # --------------------------------------
-            # ⑧ Streamlit에 그래프 출력
-            # --------------------------------------
-
             st.plotly_chart(
                 fig_quality,
                 use_container_width=True
@@ -777,6 +754,136 @@ elif menu == "품질 관리":
 
             st.warning(
                 "불량률을 계산할 수 있는 설비가 없습니다."
+            )
+
+        st.divider()
+
+        # ==========================================
+        # 7-6. 날짜별 불량률 변화 (새로운 기능)
+        # ==========================================
+
+        st.subheader("날짜별 불량률 변화")
+
+        st.write(
+            "날짜별 생산량과 불량 수량을 이용하여 "
+            "불량률이 어떻게 변화하는지 확인합니다."
+        )
+
+        # ------------------------------------------
+        # ① 날짜 추출
+        # ------------------------------------------
+
+        # 원본 데이터를 변경하지 않도록 복사
+        daily_df = df.copy()
+
+        # timestamp에서 날짜만 추출
+        daily_df["date"] = daily_df["timestamp"].dt.date
+
+        # 날짜가 없는 기록 제외
+        daily_df = daily_df.dropna(subset=["date"])
+
+        # ------------------------------------------
+        # ② 날짜별 생산량과 불량 수량 합계
+        # ------------------------------------------
+
+        daily_data = (
+            daily_df.groupby("date")[
+                ["production_count", "defect_count"]
+            ]
+            .sum()
+            .reset_index()
+        )
+
+        # ------------------------------------------
+        # ③ 날짜별 불량률 계산
+        # ------------------------------------------
+
+        # 생산량이 0인 날짜는 계산 불가로 처리
+        daily_data["defect_rate"] = (
+            daily_data["defect_count"]
+            /
+            daily_data["production_count"].replace(
+                0, float("nan")
+            )
+            * 100
+        )
+
+        # ------------------------------------------
+        # ④ 날짜순 정렬
+        # ------------------------------------------
+
+        daily_data = daily_data.sort_values(
+            "date",
+            ascending=True
+        )
+
+        # ------------------------------------------
+        # ⑤ Plotly 선그래프
+        # ------------------------------------------
+
+        if not daily_data.empty:
+
+            fig_daily = px.line(
+                daily_data,
+                x="date",
+                y="defect_rate",
+                title="날짜별 불량률 변화",
+                markers=True,
+                labels={
+                    "date": "날짜",
+                    "defect_rate": "불량률(%)"
+                }
+            )
+
+            # 날짜와 불량률을 마우스로 확인
+            fig_daily.update_traces(
+                hovertemplate=(
+                    "날짜: %{x|%Y-%m-%d}<br>"
+                    "불량률: %{y:.2f}%"
+                    "<extra></extra>"
+                )
+            )
+
+            # 그래프 디자인
+            fig_daily.update_layout(
+                xaxis_title="날짜",
+                yaxis_title="불량률(%)",
+                height=500,
+                margin=dict(
+                    l=30,
+                    r=30,
+                    t=70,
+                    b=30
+                ),
+                yaxis=dict(
+                    rangemode="tozero",
+                    ticksuffix="%"
+                )
+            )
+
+            # 날짜 표시 형식
+            fig_daily.update_xaxes(
+                tickformat="%Y-%m-%d"
+            )
+
+            # Streamlit에 선그래프 출력
+            st.plotly_chart(
+                fig_daily,
+                use_container_width=True
+            )
+
+            # 생산량이 0인 날짜 안내
+            if (daily_data["production_count"] == 0).any():
+
+                st.info(
+                    "생산량이 0인 날짜는 불량률을 "
+                    "계산할 수 없어 그래프에서 점이 표시되지 않습니다."
+                )
+
+        else:
+
+            st.warning(
+                "날짜별 불량률을 분석할 수 있는 데이터가 없습니다."
             )
 
     else:
